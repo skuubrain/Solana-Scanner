@@ -5,79 +5,157 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Solana Scanner Dashboard</title>
 <style>
-body { font-family: Arial, sans-serif; margin: 20px; }
+body { font-family: Arial, sans-serif; margin: 20px; background: #fafafa; }
 h1 { color: #2c3e50; }
-button { padding: 10px 15px; margin: 10px 0; cursor: pointer; }
-table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+button { padding: 10px 15px; margin: 10px 5px; cursor: pointer; border-radius: 6px; border: none; background: #3498db; color: white; font-weight: bold; }
+button:hover { background: #2980b9; }
+table { border-collapse: collapse; width: 100%; margin-top: 15px; background: white; border-radius: 6px; overflow: hidden; box-shadow: 0 2px 6px rgba(0,0,0,0.05); }
 th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
 th { background-color: #f2f2f2; }
 .status-HOLDING { color: green; font-weight: bold; }
 .status-SOLD { color: red; font-weight: bold; }
 .status-PARTIAL { color: orange; font-weight: bold; }
+.status-BOUGHT_MORE { color: blue; font-weight: bold; }
+input { padding: 6px; margin-right: 8px; }
 </style>
 </head>
 <body>
 <h1>Solana Scanner Dashboard</h1>
-<button onclick="runScan()">Run Scanner</button>
 
-<h2>Co-Purchase Signals</h2>
-<table id="signalsTable">
-<thead>
-<tr><th>Token</th><th>Wallet</th><th>Purchase Time</th><th>Status</th><th>Amount Remaining</th></tr>
-</thead>
-<tbody></tbody>
-</table>
+<!-- CO-PURCHASE SCANNER -->
+<section>
+  <h2>Co-Purchase Scanner</h2>
+  <button onclick="runScan()">Run Scanner</button>
+  <table id="signalsTable">
+    <thead>
+      <tr>
+        <th>Token</th>
+        <th>Wallet</th>
+        <th>Purchase Time</th>
+        <th>Status</th>
+        <th>Amount Remaining</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
 
-<h2>Custom Wallets</h2>
-<table id="customTable">
-<thead>
-<tr><th>Wallet</th><th>Token</th><th>Purchase Time</th><th>Status</th><th>Amount Remaining</th></tr>
-</thead>
-<tbody></tbody>
-</table>
+<hr>
+
+<!-- CUSTOM WALLET TRACKER -->
+<section>
+  <h2>Custom Wallet Tracker</h2>
+  <div>
+    <input type="text" id="walletInput" placeholder="Wallet address">
+    <input type="text" id="nameInput" placeholder="Name (optional)">
+    <button onclick="addWallet()">Add Wallet</button>
+    <button onclick="scanCustom()">Scan Custom Wallets</button>
+  </div>
+
+  <h3>Tracked Wallets</h3>
+  <ul id="walletList"></ul>
+
+  <h3>Custom Wallet Results</h3>
+  <table id="customTable">
+    <thead>
+      <tr>
+        <th>Wallet</th>
+        <th>Token</th>
+        <th>Purchase Time</th>
+        <th>Status</th>
+        <th>Current Amount</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</section>
 
 <script>
 async function runScan() {
-    document.querySelector("#signalsTable tbody").innerHTML = "<tr><td colspan='5'>Scanning...</td></tr>";
-    const res = await fetch("/scan", {method:"POST"});
-    if(res.ok) { loadTables(); }
+  const tbody = document.querySelector("#signalsTable tbody");
+  tbody.innerHTML = "<tr><td colspan='5'>Scanning...</td></tr>";
+  const res = await fetch("/scan", { method: "POST" });
+  if (res.ok) loadTables();
 }
 
 async function loadTables() {
-    const signals = await fetch("/co_purchase").then(r=>r.json());
-    const tbody = document.querySelector("#signalsTable tbody");
-    tbody.innerHTML = "";
-    signals.forEach(entry=>{
-        Object.entries(entry.wallets).forEach(([wallet,wdata])=>{
-            const status=wdata.status||"HOLDING";
-            const amount=wdata.amount_remaining||0;
-            tbody.innerHTML += `<tr>
-                <td>${entry.token}</td>
-                <td>${wallet}</td>
-                <td>${wdata.purchase_time}</td>
-                <td class="status-${status}">${status}</td>
-                <td>${amount}</td>
-            </tr>`;
-        });
+  // Load co-purchase results
+  const signals = await fetch("/co_purchase").then(r => r.json());
+  const tbody = document.querySelector("#signalsTable tbody");
+  tbody.innerHTML = "";
+  signals.forEach(entry => {
+    Object.entries(entry.wallets).forEach(([wallet, wdata]) => {
+      const status = wdata.status || "HOLDING";
+      const amount = wdata.amount_remaining || 0;
+      tbody.innerHTML += `<tr>
+        <td>${entry.token}</td>
+        <td>${wallet}</td>
+        <td>${wdata.purchase_time}</td>
+        <td class="status-${status}">${status}</td>
+        <td>${amount}</td>
+      </tr>`;
     });
+  });
 
-    const custom = await fetch("/custom_results").then(r=>r.json());
-    const ctbody = document.querySelector("#customTable tbody");
-    ctbody.innerHTML="";
-    custom.forEach(entry=>{
-        entry.tokens_bought.forEach(token=>{
-            const status=token.status||"HOLDING";
-            const amount=token.amount_remaining||0;
-            ctbody.innerHTML += `<tr>
-                <td>${entry.wallet_address}</td>
-                <td>${token.token}</td>
-                <td>${token.first_purchase}</td>
-                <td class="status-${status}">${status}</td>
-                <td>${amount}</td>
-            </tr>`;
-        });
+  // Load custom tracker results
+  const custom = await fetch("/custom_results").then(r => r.json());
+  const ctbody = document.querySelector("#customTable tbody");
+  ctbody.innerHTML = "";
+  custom.forEach(entry => {
+    Object.entries(entry.tokens || {}).forEach(([token, tdata]) => {
+      const status = tdata.status || "HOLDING";
+      const amount = tdata.current_amount || 0;
+      ctbody.innerHTML += `<tr>
+        <td>${entry.wallet_address}</td>
+        <td>${token}</td>
+        <td>${tdata.purchase_time}</td>
+        <td class="status-${status}">${status}</td>
+        <td>${amount}</td>
+      </tr>`;
     });
+  });
+
+  // Load tracked wallet list
+  const wallets = await fetch("/wallets").then(r => r.json());
+  const ul = document.querySelector("#walletList");
+  ul.innerHTML = "";
+  wallets.forEach(w => {
+    ul.innerHTML += `<li>
+      ${w.name} (${w.address})
+      <button onclick="removeWallet('${w.address}')">❌ Remove</button>
+    </li>`;
+  });
 }
+
+async function addWallet() {
+  const wallet = document.querySelector("#walletInput").value.trim();
+  const name = document.querySelector("#nameInput").value.trim();
+  if (!wallet) return alert("Enter a wallet address");
+  const res = await fetch("/add_wallet", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wallet, name })
+  });
+  if (res.ok) loadTables();
+}
+
+async function removeWallet(wallet) {
+  const res = await fetch("/remove_wallet", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ wallet })
+  });
+  if (res.ok) loadTables();
+}
+
+async function scanCustom() {
+  const ctbody = document.querySelector("#customTable tbody");
+  ctbody.innerHTML = "<tr><td colspan='5'>Scanning custom wallets...</td></tr>";
+  const res = await fetch("/custom_scan", { method: "POST" });
+  if (res.ok) loadTables();
+}
+
+// Initial load
 loadTables();
 </script>
 </body>
