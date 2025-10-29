@@ -1,4 +1,9 @@
+# Ensure pip can fetch pre-built wheels
+pip>=25.3
+setuptools>=68
+wheel>=0.41
+
+# Your main dependencies
 Flask==3.0.3
 aiohttp==3.9.5
 pandas==2.2.2
-requests==2.31.0
