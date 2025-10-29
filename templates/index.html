@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solana Scanner Dashboard</title>
+<style>
+body { font-family: Arial, sans-serif; margin: 20px; }
+h1 { color: #2c3e50; }
+button { padding: 10px 15px; margin: 10px 0; cursor: pointer; }
+table { border-collapse: collapse; width: 100%; margin-top: 15px; }
+th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+th { background-color: #f2f2f2; }
+.status-HOLDING { color: green; font-weight: bold; }
+.status-SOLD { color: red; font-weight: bold; }
+.status-PARTIAL { color: orange; font-weight: bold; }
+</style>
+</head>
+<body>
+<h1>Solana Scanner Dashboard</h1>
+<button onclick="runScan()">Run Scanner</button>
+
+<h2>Co-Purchase Signals</h2>
+<table id="signalsTable">
+<thead>
+<tr><th>Token</th><th>Wallet</th><th>Purchase Time</th><th>Status</th><th>Amount Remaining</th></tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<h2>Custom Wallets</h2>
+<table id="customTable">
+<thead>
+<tr><th>Wallet</th><th>Token</th><th>Purchase Time</th><th>Status</th><th>Amount Remaining</th></tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<script>
+async function runScan() {
+    document.querySelector("#signalsTable tbody").innerHTML = "<tr><td colspan='5'>Scanning...</td></tr>";
+    const res = await fetch("/scan", {method:"POST"});
+    if(res.ok) { loadTables(); }
+}
+
+async function loadTables() {
+    const signals = await fetch("/co_purchase").then(r=>r.json());
+    const tbody = document.querySelector("#signalsTable tbody");
+    tbody.innerHTML = "";
+    signals.forEach(entry=>{
+        Object.entries(entry.wallets).forEach(([wallet,wdata])=>{
+            const status=wdata.status||"HOLDING";
+            const amount=wdata.amount_remaining||0;
+            tbody.innerHTML += `<tr>
+                <td>${entry.token}</td>
+                <td>${wallet}</td>
+                <td>${wdata.purchase_time}</td>
+                <td class="status-${status}">${status}</td>
+                <td>${amount}</td>
+            </tr>`;
+        });
+    });
+
+    const custom = await fetch("/custom_results").then(r=>r.json());
+    const ctbody = document.querySelector("#customTable tbody");
+    ctbody.innerHTML="";
+    custom.forEach(entry=>{
+        entry.tokens_bought.forEach(token=>{
+            const status=token.status||"HOLDING";
+            const amount=token.amount_remaining||0;
+            ctbody.innerHTML += `<tr>
+                <td>${entry.wallet_address}</td>
+                <td>${token.token}</td>
+                <td>${token.first_purchase}</td>
+                <td class="status-${status}">${status}</td>
+                <td>${amount}</td>
+            </tr>`;
+        });
+    });
+}
+loadTables();
+</script>
+</body>
+</html>
